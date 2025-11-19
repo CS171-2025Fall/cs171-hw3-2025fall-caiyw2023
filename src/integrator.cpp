@@ -184,7 +184,8 @@ Vec3f IntersectionTestIntegrator::directLighting(
 
 void PathIntegrator::render(ref<Camera> camera, ref<Scene> scene) {
   // This is left as the next assignment
-  UNIMPLEMENTED;
+  // UNIMPLEMENTED;
+  return;
 }
 
 Vec3f PathIntegrator::Li(

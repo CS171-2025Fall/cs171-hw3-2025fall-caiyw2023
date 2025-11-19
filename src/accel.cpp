@@ -92,10 +92,40 @@ bool TriangleIntersect(Ray &ray, const uint32_t &triangle_index,
   // You can use @see Cross and @see Dot for determinant calculations.
 
   // Delete the following lines after you implement the function
-  InternalScalarType u = InternalScalarType(0);
-  InternalScalarType v = InternalScalarType(0);
-  InternalScalarType t = InternalScalarType(0);
-  UNIMPLEMENTED;
+  // InternalScalarType u = InternalScalarType(0);
+  // InternalScalarType v = InternalScalarType(0);
+  // InternalScalarType t = InternalScalarType(0);
+  // UNIMPLEMENTED;
+  InternalVecType e1 = v1 - v0;
+  InternalVecType e2 = v2 - v0;
+  InternalVecType ori = Cast<InternalScalarType>(ray.origin);
+
+  InternalVecType s1 = Cross(dir, e2);
+  InternalScalarType det = Dot(e1, s1);
+
+  const InternalScalarType eps = 1e-8;
+  if (abs(det) < eps) {
+    return false;
+  }
+  
+  InternalScalarType inv_det = 1 / det;
+  InternalVecType s = ori - v0;
+  InternalScalarType u = Dot(s, s1) * inv_det;
+
+  if (u < 0 || u > 1) {
+    return false;
+  }
+
+  InternalVecType s2 = Cross(s, e1);
+  InternalScalarType v = Dot(dir, s2) * inv_det;
+  if (v < 0 || u + v > 1) {
+    return false;
+  }
+
+  InternalScalarType t = Dot(e2, s2) * inv_det;
+  if (!ray.withinTimeRange(static_cast<Float>(t))) {
+    return false;
+  }
 
   // We will reach here if there is an intersection
 

@@ -61,7 +61,11 @@
 #define RDR_FORCEINLINE inline
 
 // TODO
-#define UNIMPLEMENTED assert(false)
+#define UNIMPLEMENTED \
+    do { \
+        assert(false && "Unimplemented function called!"); \
+        return {}; \
+    } while (0)
 
 template <typename... T>
 RDR_FORCEINLINE decltype(auto) print(T &&...args) {
