@@ -257,7 +257,8 @@ public:
          << "]";
       return ss.str();
     }
-
+    Vec3f EnvIntegrator::directLighting(
+    ref<Scene> scene, SurfaceInteraction &interaction, Sampler &sampler) const;
   protected:
     int spp;
     int max_depth;

@@ -346,7 +346,176 @@ Vec3f BDPTIntegrator::directLighting(
 }
 
 void EnvIntegrator::render(ref<Camera> camera, ref<Scene> scene) {
-  
+  std::atomic<int> cnt = 0;
+
+  const Vec2i &resolution = camera->getFilm()->getResolution();
+#pragma omp parallel for schedule(dynamic)
+  for (int dx = 0; dx < resolution.x; dx++) {
+    ++cnt;
+    if (cnt % (resolution.x / 10) == 0)
+      Info_("Rendering: {:.02f}%", cnt * 100.0 / resolution.x);
+    Sampler sampler;
+    for (int dy = 0; dy < resolution.y; dy++) {
+      sampler.setPixelIndex2D(Vec2i(dx, dy));
+      for (int sample = 0; sample < spp; sample++) {
+        // TODO(HW3): generate #spp rays for each pixel and use Monte Carlo
+        // integration to compute radiance.
+        //
+        // Useful Functions:
+        //
+        // @see Sampler::getPixelSample for getting the current pixel sample
+        // as Vec2f.
+        //
+        // @see Camera::generateDifferentialRay for generating rays given
+        // pixel sample positions as 2 floats.
+
+        // You should assign the following two variables
+        // const Vec2f &pixel_sample = ...
+        // auto ray = ...
+
+        // After you assign pixel_sample and ray, you can uncomment the
+        // following lines to accumulate the radiance to the film.
+        //
+        //
+        // Accumulate radiance
+        // assert(pixel_sample.x >= dx && pixel_sample.x <= dx + 1);
+        // assert(pixel_sample.y >= dy && pixel_sample.y <= dy + 1);
+        // const Vec3f &L = Li(scene, ray, sampler);
+        // camera->getFilm()->commitSample(pixel_sample, L);
+
+        const Vec2f pixel_sample = sampler.getPixelSample();
+        assert(pixel_sample.x >= dx && pixel_sample.x <= dx + 1);
+        assert(pixel_sample.y >= dy && pixel_sample.y <= dy + 1);
+        auto ray = camera->generateDifferentialRay(
+            pixel_sample.x, pixel_sample.y);
+        const Vec3f &L = Li(scene, ray, sampler);
+        camera->getFilm()->commitSample(pixel_sample, L);
+      }
+    }
+  }
+}
+
+Vec3f EnvIntegrator::Li(
+    ref<Scene> scene, DifferentialRay &ray, Sampler &sampler) const {
+  Vec3f color(0.0);
+  bool diffuse_found = false;
+  SurfaceInteraction interaction;
+
+  for (int depth = 0; depth < max_depth; ++depth) {
+
+    bool intersected = scene->intersect(ray, interaction);
+
+    if (!intersected) {
+      const auto & env_light = scene->getInfiniteLight();
+      if (env_light) {
+        color = env_light->Le(interaction, ray.direction);
+      }
+      return color;
+    }
+
+    bool is_ideal_diffuse =
+        dynamic_cast<const IdealDiffusion *>(interaction.bsdf) != nullptr;
+    bool is_perfect_refraction =
+        dynamic_cast<const PerfectRefraction *>(interaction.bsdf) != nullptr;
+
+    // Set the outgoing direction
+    interaction.wo = -ray.direction;
+
+    if (is_perfect_refraction) {
+      // We should follow the specular direction
+      // TODO(HW3): call the interaction.bsdf->sample to get the new direction
+      // and update the ray accordingly.
+      //
+      // Useful Functions:
+      // @see BSDF::sample
+      // @see SurfaceInteraction::spawnRay
+      //
+      // You should update ray = ... with the spawned ray
+      interaction.bsdf->sample(
+          interaction, sampler, nullptr);
+      ray = interaction.spawnRay(interaction.wi);
+      continue;
+    }
+
+    if (is_ideal_diffuse) {
+      // We only consider diffuse surfaces for direct lighting
+      diffuse_found = true;
+      break;
+    }
+
+    // We simply omit any other types of surfaces
+    break;
+  }
+
+  if (!diffuse_found) {
+    return color;
+  }
+
+  color = directLighting(scene, interaction, sampler);
+  return color;
+}
+
+Vec3f EnvIntegrator::directLighting(
+    ref<Scene> scene, SurfaceInteraction &interaction, Sampler &sampler) const {
+  Vec3f L(0.0f);
+
+  const auto &env_light = scene->getInfiniteLight();
+  if (!env_light) {
+    return L;
+  }
+
+  const BSDF *bsdf = interaction.bsdf;
+  bool is_ideal_diffuse =
+      dynamic_cast<const IdealDiffusion *>(bsdf) != nullptr;
+  if (!bsdf || !is_ideal_diffuse) {
+    return L;
+  }
+
+  Vec3f albedo = bsdf->evaluate(interaction);
+
+  const int n_samples = 16; 
+
+  Vec3f n = interaction.normal;
+
+  for (int i = 0; i < n_samples; ++i) {
+    Vec3f dir;
+    while (true) {
+    Float x = 2.0f * sampler.get1D() - 1.0f; 
+    Float y = 2.0f * sampler.get1D() - 1.0f; 
+    Float z = 2.0f * sampler.get1D() - 1.0f; 
+    dir = Vec3f(x, y, z);
+
+    Float len2 = Dot(dir, dir);
+    if (len2 > 1e-4f && len2 <= 1.0f) {
+      dir /= std::sqrt(len2);
+      break;
+      }
+    }
+    if (Dot(dir, n) < 0.0f) {
+      dir = -dir;
+    }
+
+    Float cos_theta = Dot(dir, n);
+    if (cos_theta <= 0.0f) {
+      continue;
+    }
+
+    auto test_ray       = DifferentialRay(interaction.p, dir);
+
+    SurfaceInteraction shadow_isect;
+    if (scene->intersect(test_ray, shadow_isect)) {
+      continue;
+    }
+
+    SurfaceInteraction interact; 
+    Vec3f Le = env_light->Le(interact, dir);
+
+    L += Le * albedo * cos_theta;
+  }
+
+  L /= Float(n_samples);
+
+  return L;
 }
 
 /* ===================================================================== *
