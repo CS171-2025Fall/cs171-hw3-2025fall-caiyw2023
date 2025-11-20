@@ -43,7 +43,21 @@ bool AABB::intersect(const Ray &ray, Float *t_in, Float *t_out) const {
   //    for getting the inverse direction of the ray.
   // @see Min/Max/ReduceMin/ReduceMax
   //    for vector min/max operations.
-  UNIMPLEMENTED;
+  const Vec3f &inv_dir = ray.safe_inverse_direction;
+  Vec3f origin     = ray.origin;
+  Vec3f t0s       = (low_bnd - origin) * inv_dir;
+  Vec3f t1s       = (upper_bnd - origin) * inv_dir;
+  Vec3f t_enter = Min(t0s, t1s);
+  Vec3f t_exit  = Max(t0s, t1s);
+  Float t_enter_max = ReduceMax(t_enter);
+  Float t_exit_min  = ReduceMin(t_exit);
+
+  if (t_enter_max > t_exit_min || t_exit_min < 0) {
+    return false;
+  }
+  *t_in  = t_enter_max;
+  *t_out = t_exit_min;
+  return true;
 }
 
 /* ===================================================================== *

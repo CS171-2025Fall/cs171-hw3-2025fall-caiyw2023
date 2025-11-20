@@ -207,6 +207,63 @@ protected:
   }
 };
 
+class BDPTIntegrator final : public Integrator {
+  public:
+    BDPTIntegrator(const Properties &props)
+      : Integrator(props) {
+    spp             = props.getProperty<int>("spp", 4);
+    max_depth       = props.getProperty<int>("max_depth", 5);
+    rr_threshold    = props.getProperty<Float>("rr_threshold", 0.1);
+    
+  }
+    void render(ref<Camera> camera, ref<Scene> scene) override;
+    Vec3f Li(  // NOLINT
+      ref<Scene> scene, DifferentialRay &ray, Sampler &sampler) const;
+    std::string toString() const override {
+      std::ostringstream ss;
+      ss << "BDPTIntegrator[\n"
+         << format("  spp          = {}\n", spp)
+         << format("  max_depth    = {}\n", max_depth)
+         << format("  rr_threshold = {}\n", rr_threshold)
+         << "]";
+      return ss.str();
+    }
+  Vec3f directLighting(ref<Scene> scene, SurfaceInteraction &interaction, Sampler &sampler) const;
+
+  protected:
+    int spp;
+    int max_depth;
+    Float rr_threshold;
+};
+
+class EnvIntegrator final : public Integrator {
+public:
+  EnvIntegrator(const Properties &props)
+      : Integrator(props) {
+    spp             = props.getProperty<int>("spp", 4);
+    max_depth       = props.getProperty<int>("max_depth", 5);
+    rr_threshold    = props.getProperty<Float>("rr_threshold", 0.1);
+    
+  }
+    void render(ref<Camera> camera, ref<Scene> scene) override;
+    Vec3f Li(  // NOLINT
+      ref<Scene> scene, DifferentialRay &ray, Sampler &sampler) const;
+    std::string toString() const override {
+      std::ostringstream ss;
+      ss << "EnvIntegrator[\n"
+         << format("  spp          = {}\n", spp)
+         << format("  max_depth    = {}\n", max_depth)
+         << format("  rr_threshold = {}\n", rr_threshold)
+         << "]";
+      return ss.str();
+    }
+
+  protected:
+    int spp;
+    int max_depth;
+    Float rr_threshold;
+};
+
 // CObject Registration
 RDR_REGISTER_CLASS(PathIntegrator)
 RDR_REGISTER_CLASS(IncrementalPathIntegrator)
